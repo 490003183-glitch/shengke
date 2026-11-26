@@ -1,0 +1,5 @@
+module CLame [system] {
+    header "../../ThirdParty/lame/lame-3.100/include/lame.h"
+    link "mp3lame"
+    export *
+}

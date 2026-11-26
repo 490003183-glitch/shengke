@@ -1,0 +1,1 @@
+../../Sources/WaveStudio/EditorWindow.swift

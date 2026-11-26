@@ -1,0 +1,1 @@
+../../Sources/WaveStudio/UsageNotesWindow.swift

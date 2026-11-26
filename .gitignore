@@ -1,0 +1,27 @@
+.build/
+.DS_Store
+tmp/
+dist/
+.swiftpm/
+*.xcuserstate
+*.xcuserdatad/
+.env
+.env.*
+*.pem
+*.key
+
+# Reproducible, machine-specific dependency build products.
+ThirdParty/lame/install/
+ThirdParty/lame/lame-3.100/
+ThirdParty/lame/build.log
+
+# Local development history, reference originals and personal notes.
+AGENTS.md
+开发台账.md
+使用建议.md
+docs/local/
+docs/参考资料/
+docs/测试记录/
+docs/功能与验收清单.md
+docs/界面与交互设计.md
+docs/音频工作流审视与优化.md
