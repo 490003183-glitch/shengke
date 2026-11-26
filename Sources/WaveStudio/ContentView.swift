@@ -78,7 +78,7 @@ struct ContentView: View {
             Spacer(minLength:8)
             }.contentShape(Rectangle()).help("双击空白处最大化 / 还原窗口")
             Button {model.overwriteOriginal()} label:{Label("写入并覆盖原文件",systemImage:"checkmark.circle")}.disabled(!canProcess || model.sourceFile == nil).help("⌘S · 保留源文件编码，保存完整音频")
-            Button {model.saveCopy()} label:{Label("保存为副本",systemImage:"doc.on.doc")}.disabled(!canProcess).help("⇧⌘S · 保留源文件编码，原文件不变")
+            Button {model.saveCopy()} label:{Label("保存为副本",systemImage:"doc.on.doc")}.disabled(!canProcess).help("⇧⌘S · 选择音频格式，原文件不变")
             Button {model.convertSourceToWAV()} label:{Label("删除源文件并保存为 WAV",systemImage:"arrow.triangle.2.circlepath")}.disabled(!canProcess || model.sourceFile == nil).help("在原目录保存完整 WAV 24-bit，校验成功后将源文件移入废纸篓")
             Button {model.showUsageNotes?()} label:{Image(systemName:"exclamationmark.circle").font(.system(size:18))}.buttonStyle(.plain).help("使用建议 · 关闭即保存").accessibilityLabel("使用建议")
 
@@ -108,7 +108,7 @@ struct ContentView: View {
             Image(systemName:"waveform.path").font(.system(size:64,weight:.ultraLight)).foregroundStyle(mint.opacity(0.8)).padding(.bottom,8)
             Text("直接从音频文件开始").font(.system(size:23,weight:.medium))
             Text("在 Finder 右键音频 → 打开方式 → 声刻，或把文件拖到这里").font(.system(size:13)).foregroundStyle(.secondary)
-            HStack(spacing:22) {Label("原编码覆盖",systemImage:"checkmark.circle");Label("原编码副本",systemImage:"doc.on.doc");Label("转为 WAV",systemImage:"waveform")}.font(.system(size:12)).foregroundStyle(.secondary).padding(.top,20)
+            HStack(spacing:22) {Label("原编码覆盖",systemImage:"checkmark.circle");Label("副本可选格式",systemImage:"doc.on.doc");Label("转为 WAV",systemImage:"waveform")}.font(.system(size:12)).foregroundStyle(.secondary).padding(.top,20)
         }
     }
     var zoomBar:some View {

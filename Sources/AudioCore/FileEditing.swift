@@ -80,6 +80,16 @@ public struct SourceEncoding {
     public static func mp3(rate:Double,channels:Int,bitRate:Int=192000,variable:Bool=false)->SourceEncoding {
         SourceEncoding(container:kAudioFileMP3Type,codec:kAudioFormatMPEGLayer3,rate:rate,channels:channels,bits:0,isFloat:false,bitRate:bitRate,variableMP3:variable,settings:[:])
     }
+    public static func aiff(rate:Double,channels:Int)->SourceEncoding {
+        SourceEncoding(container:kAudioFileAIFFType,codec:kAudioFormatLinearPCM,rate:rate,channels:channels,bits:24,isFloat:false,bitRate:Int(rate)*channels*24,variableMP3:false,settings:[AVFormatIDKey:kAudioFormatLinearPCM,AVSampleRateKey:rate,AVNumberOfChannelsKey:channels,AVLinearPCMBitDepthKey:24,AVLinearPCMIsFloatKey:false,AVLinearPCMIsBigEndianKey:true,AVLinearPCMIsNonInterleaved:false])
+    }
+    public static func compressed(rate:Double,channels:Int,lossless:Bool,flac:Bool=false)->SourceEncoding {
+        let codec=lossless ? (flac ? kAudioFormatFLAC : kAudioFormatAppleLossless) : kAudioFormatMPEG4AAC
+        let bitRate=lossless ? 0 : (rate<44100 ? 96000 : 128000)*channels
+        var settings:[String:Any]=[AVFormatIDKey:codec,AVSampleRateKey:rate,AVNumberOfChannelsKey:channels]
+        if lossless {settings[AVEncoderBitDepthHintKey]=24} else {settings[AVEncoderBitRateKey]=bitRate}
+        return SourceEncoding(container:flac ? kAudioFileFLACType : kAudioFileM4AType,codec:codec,rate:rate,channels:channels,bits:lossless ? 24 : 0,isFloat:false,bitRate:bitRate,variableMP3:false,settings:settings)
+    }
     private init(container:AudioFileTypeID,codec:AudioFormatID,rate:Double,channels:Int,bits:Int,isFloat:Bool,bitRate:Int,variableMP3:Bool,settings:[String:Any]) {
         self.container=container;self.codec=codec;self.rate=rate;self.channels=channels;self.bits=bits;self.isFloat=isFloat;self.bitRate=bitRate;self.variableMP3=variableMP3;self.settings=settings
     }
@@ -117,6 +127,7 @@ public struct WAVConversionResult {
 public enum FileAudioWriter {
     public static func write(_ audio:AudioDocument,to destination:URL,encoding:SourceEncoding,overwriting source:SourceAudioFile?=nil,exclusive:Bool=false) throws {
         guard audio.frames>0,audio.rate==encoding.rate,audio.channels==encoding.channels else {throw AudioError.invalid("音频为空，或采样率/声道与源编码不一致。")}
+        guard encoding.codec != kAudioFormatFLAC || audio.frames>=4608 else {throw AudioError.invalid("当前系统的 FLAC 编码器无法保存少于 4608 帧的音频。请保存为 WAV、AIFF 或 Apple Lossless 副本。")}
         if let source=source {
             guard destination.resolvingSymlinksInPath().standardizedFileURL==source.url else {throw AudioError.invalid("覆盖目标与源文件不一致。")}
             try source.assertUnchanged()
@@ -140,9 +151,9 @@ public enum FileAudioWriter {
         let result=temp.withUnsafeFileSystemRepresentation {src in destination.withUnsafeFileSystemRepresentation {dst in exclusive ? renamex_np(src!,dst!,UInt32(RENAME_EXCL)) : Darwin.rename(src!,dst!)}}
         guard result==0 else {throw NSError(domain:NSPOSIXErrorDomain,code:Int(errno))}
     }
-    public static func copy(_ audio:AudioDocument,source:SourceAudioFile,to destination:URL) throws {
+    public static func copy(_ audio:AudioDocument,source:SourceAudioFile,to destination:URL,encoding:SourceEncoding?=nil) throws {
         guard destination.resolvingSymlinksInPath().standardizedFileURL != source.url else {throw AudioError.invalid("副本不能与源文件使用同一个路径。请另取文件名。")}
-        try write(audio,to:destination,encoding:source.encoding)
+        try write(audio,to:destination,encoding:encoding ?? source.encoding)
     }
     public static func convertToWAV(_ audio:AudioDocument,source:SourceAudioFile,trash:(URL)throws->URL? = moveToTrash) throws -> WAVConversionResult {
         try source.assertUnchanged()

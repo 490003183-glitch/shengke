@@ -1,6 +1,6 @@
 # 声刻 · Shengke
 
-Native macOS audio editor built with SwiftUI, AppKit and AVFoundation. Open a file, edit its waveform, listen and save. **Version 0.4.0 — development preview.**
+Native macOS audio editor built with SwiftUI, AppKit and AVFoundation. Open a file, edit its waveform, listen and save. **Version 0.5.0 — development preview.**
 
 声刻是一款 Swift 原生 Mac 单文件音频编辑器。直接从 Finder 打开音频，完成剪辑和试听后保存；不使用工程文件。
 
@@ -9,7 +9,7 @@ Native macOS audio editor built with SwiftUI, AppKit and AVFoundation. Open a fi
 在 Finder 右键音频 →「打开方式」→「声刻」，或将文件拖入窗口 / Dock 图标。顶部保留三个文件动作：
 
 1. **写入并覆盖原文件**（⌘S）：按源文件编码保存完整编辑结果。
-2. **保存为副本**（⇧⌘S）：按源文件编码保存完整副本，源文件不变。
+2. **保存为副本**（⇧⌘S）：在保存窗口选择格式，默认与源文件相同；支持 WAV 16/24/32-bit float、AIFF 24-bit、FLAC、ALAC、AAC 和 MP3。保留采样率/声道，源文件不变。
 3. **删除源文件并保存为 WAV**：原目录写入完整 WAV 24-bit，回读验证通过后将源文件移入废纸篓。
 
 三个按钮始终保存完整文件。需要独立片段时，选中后按住选区内部拖到 Finder 文件夹，输出 WAV **48 kHz / 24-bit / 立体声**，首尾各加 **15 ms** 淡入淡出；短片段自动缩短淡化长度。
@@ -17,6 +17,7 @@ Native macOS audio editor built with SwiftUI, AppKit and AVFoundation. Open a fi
 ## 编辑与交互
 
 - 波形总览、样本级显示、时间/样本精确选区、剪切、复制、粘贴、删除、裁剪、撤销与重做。
+- 删除/剪切中间片段后自动用保留音频交叉叠化，最长 15 ms；重叠使结果额外缩短相应长度。删除开头后，新开头自动加 15 ms 淡入。短片段自适应，整次操作可一次撤销。
 - **滚轮以指针下的时间点为中心横向缩放**；Shift＋滚轮或横向滚动平移。
 - 选区中上方的小旋钮用滚轮调音量，点击别处完成；边界以约 15 ms 平滑衔接，整次调节可一次撤销。
 - 空格播放/停止；P 或逗号暂停/继续；Shift＋空格从光标到末尾。

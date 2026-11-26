@@ -2,6 +2,55 @@ import Foundation
 import AVFoundation
 import AudioCore
 extension AudioCoreTests {
+    func testSelectableCopyFormats() throws {
+        for rate in [8000.0,11025,12000,16000,22050,24000,32000,44100,48000,96000] {for channels in [1,2] {
+            let original=try signal(rate:rate,channels:channels,frames:Int(rate)),url=cache.folder.appendingPathComponent("source-\(rate)-\(channels).wav")
+            try FileAudioWriter.write(original,to:url,encoding:.wav(rate:rate,channels:channels,bits:32,isFloat:true))
+            let source=try SourceAudioFile(url),before=try Data(contentsOf:url)
+            for format in CopyFormat.allCases where format.isAvailable(rate:rate,source:source.encoding) {
+                let encoding=format.encoding(rate:rate,channels:channels,source:source.encoding)
+                print("COPY FORMAT",rate,channels,format)
+                let copy=cache.folder.appendingPathComponent("copy-\(rate)-\(channels)-\(format).\(encoding.fileExtension)")
+                do {
+                try FileAudioWriter.copy(original,source:source,to:copy,encoding:encoding)
+                let actual=try SourceEncoding(inspecting:copy),back=try cache.read(copy)
+                XCTAssertEqual(actual.container,encoding.container);XCTAssertEqual(actual.codec,encoding.codec)
+                XCTAssertEqual(actual.rate,rate);XCTAssertEqual(actual.channels,channels)
+                let lossy=format == .aac || format == .mp3
+                if !lossy {
+                    XCTAssertEqual(actual.bits,encoding.bits);XCTAssertEqual(actual.isFloat,encoding.isFloat);XCTAssertEqual(back.frames,original.frames)
+                    let expected=original.samples(0..<original.frames),decoded=back.samples(0..<back.frames)
+                    let tolerance:Float=format == .wav16 ? 1.0/32768 : 1.0/8388608
+                    for c in 0..<channels {for i in 0..<original.frames {XCTAssertEqual(decoded[c][i],expected[c][i],accuracy:tolerance)}}
+                } else {XCTAssertEqual(back.duration,original.duration,accuracy:0.075);XCTAssertGreaterThan(back.peak(0..<back.frames,channel:0).high,0.3)}
+                XCTAssertThrowsError(try FileAudioWriter.copy(original,source:source,to:url,encoding:encoding))
+                } catch {failure("copy \(rate) Hz / \(channels) channels / \(format): \(error)",file:#filePath,line:#line)}
+            }
+            XCTAssertEqual(try Data(contentsOf:url),before)
+        }}
+        XCTAssertFalse(CopyFormat.mp3.isAvailable(rate:96000,source:nil))
+        XCTAssertFalse(CopyFormat.source.isAvailable(rate:48000,source:nil))
+    }
+    func testShortCopyCodecLimits() throws {
+        for frames in [1,2,719,4096,4607,4608,4609,5000,8192] {
+            let d=try signal(frames:frames)
+            for format in [CopyFormat.flac24,.aac,.mp3,.alac24] {
+                let encoding=format.encoding(rate:d.rate,channels:d.channels,source:nil)
+                let url=cache.folder.appendingPathComponent("short-\(frames)-\(format).\(encoding.fileExtension)")
+                if format == .flac24,frames<4608 {
+                    let sentinel=Data("existing target".utf8);try sentinel.write(to:url)
+                    XCTAssertFalse(format.isAvailable(rate:d.rate,source:nil,frames:frames))
+                    XCTAssertThrowsError(try FileAudioWriter.write(d,to:url,encoding:encoding))
+                    XCTAssertEqual(try Data(contentsOf:url),sentinel)
+                } else {
+                    try FileAudioWriter.write(d,to:url,encoding:encoding)
+                    let back=try cache.read(url)
+                    XCTAssertEqual(back.channels,d.channels);XCTAssertEqual(back.rate,d.rate)
+                    if format == .flac24 || format == .alac24 {XCTAssertEqual(back.frames,frames)}
+                }
+            }
+        }
+    }
     func signal(rate:Double=48000,channels:Int=2,frames:Int=48000) throws -> AudioDocument {
         try doc((0..<channels).map {c in (0..<frames).map {i in Float(sin(Double(i)*2*Double.pi*440/rate))*(c==0 ? 0.6 : 0.3)}},rate:rate)
     }

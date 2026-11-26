@@ -28,6 +28,22 @@ do {
     model.openURL(original);settle(model)
     let doc=model.audio
     check(model.sourceFile?.url==original && !model.dirty,"file opening retains source URL and actual encoding")
+    let savePanel=NSSavePanel();savePanel.nameFieldStringValue="带点.v1-副本.wav"
+    let formatPicker=SaveCopyAccessory(panel:savePanel,rate:doc.rate,channels:doc.channels,source:model.sourceFile?.encoding)
+    check(formatPicker.format == .source && formatPicker.encoding.isFloat,"copy format defaults to the original encoding")
+    for choice in [CopyFormat.mp3,.flac24,.aac,.wav24,.source] {
+        formatPicker.popup.selectItem(at:formatPicker.formats.firstIndex(of:choice)!)
+        _=formatPicker.popup.sendAction(formatPicker.popup.action!,to:formatPicker.popup.target)
+        let ext=formatPicker.encoding.fileExtension
+        check(savePanel.nameFieldStringValue=="带点.v1-副本."+ext && savePanel.allowedContentTypes.first?.preferredFilenameExtension==ext,"native format action synchronizes filename and accepted extension: \(choice)")
+    }
+    check(savePanel.accessoryView===formatPicker.view && !savePanel.allowsOtherFileTypes,"format controls are attached to the native save panel")
+    let emptyPanel=NSSavePanel();emptyPanel.nameFieldStringValue="录音.wav"
+    let emptyPicker=SaveCopyAccessory(panel:emptyPanel,rate:96000,channels:1,source:nil)
+    check(emptyPicker.format == .wav24 && !emptyPicker.formats.contains(.source) && !emptyPicker.formats.contains(.mp3),"new recording defaults to WAV24; unsupported MP3 rate is not offered")
+    let shortPanel=NSSavePanel();shortPanel.nameFieldStringValue="短.wav"
+    let shortPicker=SaveCopyAccessory(panel:shortPanel,rate:48000,channels:2,source:nil,frames:100)
+    check(!shortPicker.formats.contains(.flac24) && shortPicker.formats.contains(.alac24),"short audio excludes unsupported FLAC while retaining another lossless format")
     let waveform=WaveformNSView(frame:NSRect(x:0,y:0,width:1000,height:360));waveform.model=model
     let pointer=waveform.left+waveform.plotWidth*0.37,anchor=Double(doc.frames)*0.37
     waveform.navigateWheel(deltaX:0,deltaY:4,precise:false,shift:false,pointerX:pointer)
@@ -81,6 +97,24 @@ do {
     check(model.selection==24000..<48000 && model.undoName != nil,"new selection click first commits old gain then selects requested range")
     model.undo();model.select(0..<0)
 
+    model.select(96000..<144000)
+    let deleteEvent=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:0,context:nil,characters:"\u{7f}",charactersIgnoringModifiers:"\u{7f}",isARepeat:false,keyCode:51)!
+    check(monitor(deleteEvent)==nil,"Delete key consumes the audio selection action")
+    settle(model)
+    check(model.audio.frames==doc.frames-48000-720 && model.selection==95280..<95280 && model.undoName=="删除","Delete applies one 15 ms overlap and moves cursor to the join")
+    let deleted=model.audio.samples(0..<model.audio.frames)
+    model.undo();check(model.audio.samples(0..<doc.frames)==doc.samples(0..<doc.frames) && model.selection==96000..<144000 && !model.dirty,"one undo restores deletion samples, selection and saved state")
+    model.redo();check(model.audio.samples(0..<model.audio.frames)==deleted,"redo restores exact smoothed deletion")
+    model.undo();model.select(0..<48000);model.deleteSelection();settle(model)
+    check(model.audio.frames==doc.frames-48000 && model.audio.samples(0..<1)[0][0]==0 && model.audio.samples(720..<800)==doc.samples(48720..<48800),"head deletion fades the new start and preserves audio beyond 15 ms")
+    model.undo();model.select(48000..<96000);model.cut();settle(model)
+    check(model.audio.frames==doc.frames-48000-720 && model.undoName=="剪切","Cut also smooths the retained junction")
+    model.undo();model.select(0..<0);model.paste()
+    check(model.audio.samples(0..<48000)==doc.samples(48000..<96000),"Cut clipboard retains the exact original selected samples")
+    model.undo();model.select(0..<doc.frames);model.deleteSelection();settle(model)
+    check(!model.hasAudio && model.selection==0..<0,"delete-all produces an empty, valid editor")
+    model.undo();model.select(0..<0)
+
     model.timeUnit = .samples;model.startText="96000";model.endText="192000";model.applySelection()
     check(model.selection==96000..<192000,"sample entry selects exact range")
     model.lengthText="1";model.applySelection(useLength:true);model.zoomSelection()
@@ -109,6 +143,12 @@ do {
     check(try Data(contentsOf:original)==before,"save-copy does not change source bytes")
     check(try cache.read(copy).frames==doc.frames,"save-copy writes entire file despite a selection")
     check(try SourceEncoding(inspecting:copy).bits==32,"copy preserves original float WAV encoding")
+    let chosen=cache.folder.appendingPathComponent("选择格式.flac")
+    model.writeCopy(to:chosen,encoding:CopyFormat.flac24.encoding(rate:doc.rate,channels:doc.channels,source:nil));settle(model)
+    check(try SourceEncoding(inspecting:chosen).fileExtension=="flac" && cache.read(chosen).frames==doc.frames,"chosen copy format reaches the writer and includes the complete file")
+    check(try Data(contentsOf:original)==before && model.sourceFile?.encoding.isFloat==true,"format conversion keeps original bytes and subsequent overwrite encoding")
+    model.writeCopy(to:original,encoding:.wav(rate:doc.rate,channels:doc.channels));settle(model)
+    check(try Data(contentsOf:original)==before && model.error != nil,"copy format conversion cannot overwrite its source path");model.error=nil
     model.effect(.gain(1),name:"gain");settle(model);let expected=model.audio.samples(0..<model.audio.frames)
     model.overwriteOriginal();settle(model)
     check(!model.dirty && model.sourceFile?.url==original,"overwrite updates saved state and source identity")

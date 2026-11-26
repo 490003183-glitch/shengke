@@ -1,6 +1,64 @@
 import Foundation
 import AVFoundation
 
+/// Delete and smooth only retained audio; no samples from the deleted range leak back in.
+public enum SmoothDeletion {
+    public static let transitionSeconds=0.015
+    public struct Result {
+        public let audio:AudioDocument
+        public let cursor:Int
+        public let overlapFrames:Int
+    }
+    public static func apply(_ audio:AudioDocument,range:Range<Int>,cache:AudioCache) throws -> Result {
+        guard range.lowerBound>=0,range.upperBound<=audio.frames else {throw AudioError.invalid("删除选区超出音频范围。")}
+        guard !range.isEmpty else {return Result(audio:audio,cursor:range.lowerBound,overlapFrames:0)}
+        let left=range.lowerBound,right=audio.frames-range.upperBound
+        let target=max(1,Int((audio.rate*transitionSeconds).rounded()))
+        var next=audio.replacing(range,with:[])
+        next.markers=audio.markers.compactMap {marker in
+            guard !range.contains(marker.frame) else{return nil}
+            var moved=marker
+            if moved.frame>=range.upperBound {moved.frame -= range.count}
+            return moved
+        }
+        if left==0,right>0 {
+            let length=min(target,right)
+            let asset=try cache.makeAsset(rate:audio.rate,channels:audio.channels,frames:length) {start,count in
+                var block=audio.samples((range.upperBound+start)..<(range.upperBound+start+count))
+                for i in 0..<count {
+                    let weight=length>1 ? Float(0.5-0.5*cos(.pi*Double(start+i)/Double(length-1))) : 0
+                    for c in 0..<audio.channels {block[c][i] *= weight}
+                }
+                return block
+            }
+            let markers=next.markers
+            next=next.replacing(0..<length,with:[Piece(asset:asset,offset:0,count:length)])
+            next.markers=markers
+        } else if left>0,right>0 {
+            let length=min(target,left,right),join=left-length
+            let asset=try cache.makeAsset(rate:audio.rate,channels:audio.channels,frames:length) {start,count in
+                var a=audio.samples((join+start)..<(join+start+count))
+                let b=audio.samples((range.upperBound+start)..<(range.upperBound+start+count))
+                for i in 0..<count {
+                    // Complementary cosine weights do not boost correlated peaks.
+                    let weight=length>1 ? Float(0.5-0.5*cos(.pi*Double(start+i)/Double(length-1))) : 0.5
+                    for c in 0..<audio.channels {a[c][i]=a[c][i]*(1-weight)+b[c][i]*weight}
+                }
+                return a
+            }
+            next.pieces=audio.sliced(0..<join)+[Piece(asset:asset,offset:0,count:length)]+audio.sliced((range.upperBound+length)..<audio.frames)
+            next.markers=audio.markers.compactMap {marker in
+                guard !range.contains(marker.frame) else{return nil}
+                var moved=marker
+                if moved.frame>=range.upperBound {moved.frame -= range.count+length}
+                return moved
+            }.sorted {$0.frame<$1.frame}
+            return Result(audio:next,cursor:join,overlapFrames:length)
+        }
+        return Result(audio:next,cursor:min(left,next.frames),overlapFrames:0)
+    }
+}
+
 /// Blend the unchanged and gain-adjusted copies of the same (correlated) signal.
 /// Complementary raised-cosine weights avoid the +3 dB bulge of equal-power mixing.
 public struct SelectionGain:Equatable {

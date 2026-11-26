@@ -45,9 +45,17 @@ public final class AudioCache {
         guard file.length > 0, file.length < Int64(Int.max / 16) else { throw AudioError.invalid("音频文件为空或长度无效。") }
         let asset = try makeAsset(rate: format.sampleRate, channels: Int(format.channelCount), frames: Int(file.length)) { _, count in
             guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count)) else { throw AudioError.invalid("无法分配音频缓冲区。") }
-            try file.read(into: buffer, frameCount: AVAudioFrameCount(count))
-            guard Int(buffer.frameLength) == count, let data = buffer.floatChannelData else { throw AudioError.invalid("音频数据不完整，已取消打开。") }
-            return (0..<Int(format.channelCount)).map { Array(UnsafeBufferPointer(start: data[$0], count: count)) }
+            // A decoder may return a partial block before EOF (including mono Float WAV).
+            // Keep reading until the requested cache block is complete.
+            var samples=[[Float]](repeating:[],count:Int(format.channelCount)),filled=0
+            while filled<count {
+                try file.read(into:buffer,frameCount:AVAudioFrameCount(count-filled))
+                guard buffer.frameLength>0,let data=buffer.floatChannelData else {throw AudioError.invalid("音频数据不完整，已取消打开。")}
+                let actual=Int(buffer.frameLength)
+                for c in 0..<samples.count {samples[c].append(contentsOf:UnsafeBufferPointer(start:data[c],count:actual))}
+                filled += actual
+            }
+            return samples
         }
         return AudioDocument(rate: format.sampleRate, channels: Int(format.channelCount), pieces: [Piece(asset: asset, offset: 0, count: asset.frames)])
     }

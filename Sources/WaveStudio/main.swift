@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         window.contentView=NSHostingView(rootView:ContentView(model:model)); window.center(); window.makeKeyAndOrderFront(nil)
         do {
             let base=try FileManager.default.url(for:.applicationSupportDirectory,in:.userDomainMask,appropriateFor:nil,create:true).appendingPathComponent("WaveStudio")
-            notesWindow=UsageNotesWindow(store:try UsageNotesStore(url:base.appendingPathComponent("使用建议.md"),version:Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "0.4.0"))
+            notesWindow=UsageNotesWindow(store:try UsageNotesStore(url:base.appendingPathComponent("使用建议.md"),version:Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "0.5.0"))
         } catch {model.error="使用建议无法初始化：\(error.localizedDescription)"}
         model.usageNotesView=notesWindow?.view
         notesWindow?.onPresent={ [weak self] in self?.model.showingUsageNotes=true }
@@ -87,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             switch sender.tag {case 20:text.undoManager?.undo();return;case 21:text.undoManager?.redo();return;case 22:text.cut(nil);return;case 23:text.copy(nil);return;case 24:text.paste(nil);return;case 25:text.selectAll(nil);return;default:break}
         }
         switch sender.tag {
-        case 1: NSApp.orderFrontStandardAboutPanel(options:[.applicationName:"声刻 · Wave Studio",.applicationVersion:"0.4.0 开发预览",.credits:NSAttributedString(string:"Swift 原生音频编辑器\n参考 Sound Studio 操作流程，独立实现。")])
+        case 1: NSApp.orderFrontStandardAboutPanel(options:[.applicationName:"声刻 · Wave Studio",.applicationVersion:"0.5.0 开发预览",.credits:NSAttributedString(string:"Swift 原生音频编辑器\n参考 Sound Studio 操作流程，独立实现。")])
         case 10:model.newDocument(channels:2)
         case 11:model.newDocument(channels:1)
         case 12:model.openPanel()
@@ -124,7 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         case 53:model.zoomSelection()
         case 54:model.restoreView()
         case 55:(window as? EditorWindow)?.toggleMaximize(nil)
-        case 60:let a=NSAlert();a.messageText="声刻快捷操作";a.informativeText="空格：播放选区 / 停止；Shift + 空格：从光标播放到末尾。\n逗号或 P：暂停 / 继续；X：停止并定位。\n双击顶部标题栏或文件栏空白处：最大化 / 还原窗口。\n拖动波形选区，拖边界精调，右键从此试听。\n滚轮以指针位置横向缩放；Shift + 滚轮平移。\n选区上方旋钮滚轮调音量，点击别处完成并平滑衔接。\n按住选区内部拖出：48kHz/24-bit/立体声 WAV，首尾 15ms 淡化。\n右上角感叹号记录建议，关闭即保存，升级保留全文。\nShift + 方向键伸缩选区，⌥← / ⌥→ 跳到标记。\nR / T 缩小放大；Q / W 显示选区起终点；E 恢复视图。\nM 添加标记；D / G 对选区淡入淡出；4 切换循环。\n⌘S 原编码覆盖；⇧⌘S 原编码副本；第三按钮转为 WAV。\n\n峰值表在监听音量之前。点击峰值数字重置保持与削波灯。\n从 Finder 的“打开方式”打开音频，或拖入窗口 / Dock 图标。\n三个保存动作都保存完整文件。临时标记和撤销只在本次编辑有效。";a.runModal()
+        case 60:let a=NSAlert();a.messageText="声刻快捷操作";a.informativeText="空格：播放选区 / 停止；Shift + 空格：从光标播放到末尾。\n逗号或 P：暂停 / 继续；X：停止并定位。\n双击顶部标题栏或文件栏空白处：最大化 / 还原窗口。\n拖动波形选区，拖边界精调，右键从此试听。\n滚轮以指针位置横向缩放；Shift + 滚轮平移。\n选区上方旋钮滚轮调音量，点击别处完成并平滑衔接。\n按住选区内部拖出：48kHz/24-bit/立体声 WAV，首尾 15ms 淡化。\n右上角感叹号记录建议，关闭即保存，升级保留全文。\nShift + 方向键伸缩选区，⌥← / ⌥→ 跳到标记。\nR / T 缩小放大；Q / W 显示选区起终点；E 恢复视图。\nM 添加标记；D / G 对选区淡入淡出；4 切换循环。\n⌘S 原编码覆盖；⇧⌘S 可选格式副本；第三按钮转为 WAV。\n\n峰值表在监听音量之前。点击峰值数字重置保持与削波灯。\n从 Finder 的“打开方式”打开音频，或拖入窗口 / Dock 图标。\n三个保存动作都保存完整文件。临时标记和撤销只在本次编辑有效。";a.runModal()
         default:break
         }
     }

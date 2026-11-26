@@ -177,8 +177,11 @@ final class EditorModel: ObservableObject {
     func cut() { if flushSelectionGain({self.cut()}) {return}; guard !selection.isEmpty else{return}; copy(); deleteSelection("剪切") }
     func deleteSelection(_ name: String = "删除") {
         if flushSelectionGain({self.deleteSelection(name)}) {return}
-        guard canEdit,!selection.isEmpty else{return}; let start=selection.lowerBound
-        commit(audio.replacing(selection,with:[]),selection:start..<start,name:name)
+        guard canEdit,!selection.isEmpty else{return};stop()
+        let doc=audio,range=selection,cache=self.cache
+        perform("正在\(name)并平滑衔接…",job:{try SmoothDeletion.apply(doc,range:range,cache:cache)}) {result in
+            self.commit(result.audio,selection:result.cursor..<result.cursor,name:name)
+        }
     }
     var canPaste: Bool { clipboard != nil && canEdit }
     func paste() {
@@ -454,16 +457,17 @@ extension EditorModel {
     func saveCopy() {
         if flushSelectionGain({self.saveCopy()}) {return}
         guard canEdit,hasAudio else{return};stop()
-        let ext=sourceFile?.url.pathExtension ?? "wav",base=sourceFile?.url.deletingPathExtension().lastPathComponent ?? name
-        let panel=NSSavePanel();panel.title="保存为副本（源文件编码）";panel.allowedContentTypes=[UTType(filenameExtension:ext) ?? .audio]
+        let ext=sourceEncoding.fileExtension,base=sourceFile?.url.deletingPathExtension().lastPathComponent ?? name
+        let panel=NSSavePanel();panel.title="保存为副本"
         panel.directoryURL=sourceFile?.url.deletingLastPathComponent();panel.nameFieldStringValue=base+"-副本."+ext
-        presentFilePanel(panel) {url in guard let url=url else {self.afterSave=nil;return};self.writeCopy(to:url)}
+        let accessory=SaveCopyAccessory(panel:panel,rate:audio.rate,channels:audio.channels,source:sourceFile?.encoding,frames:audio.frames)
+        presentFilePanel(panel) {url in guard let url=url else {self.afterSave=nil;return};self.writeCopy(to:url,encoding:accessory.encoding)}
     }
-    func writeCopy(to url:URL) {
-        if flushSelectionGain({self.writeCopy(to:url)}) {return}
-        guard canEdit,hasAudio else{return};stop();let doc=audio,source=sourceFile,encoding=sourceEncoding
+    func writeCopy(to url:URL,encoding requested:SourceEncoding?=nil) {
+        if flushSelectionGain({self.writeCopy(to:url,encoding:requested)}) {return}
+        guard canEdit,hasAudio else{return};stop();let doc=audio,source=sourceFile,encoding=requested ?? sourceEncoding
         perform("正在保存副本…",job:{
-            if let source=source {try FileAudioWriter.copy(doc,source:source,to:url)}
+            if let source=source {try FileAudioWriter.copy(doc,source:source,to:url,encoding:encoding)}
             else {try FileAudioWriter.write(doc,to:url,encoding:encoding)}
             return url
         }) {saved in self.completeSave(revision:doc.revision,url:saved,message:"已保存副本：\(saved.lastPathComponent) · 原文件未改动")}

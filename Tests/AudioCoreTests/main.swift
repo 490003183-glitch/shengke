@@ -10,6 +10,11 @@ func XCTAssertGreaterThan<T:Comparable>(_ a:T,_ b:T,file:StaticString=#filePath,
 func XCTAssertThrowsError<T>(_ expr:@autoclosure () throws -> T,file:StaticString=#filePath,line:UInt=#line) { do { _=try expr();failure("Expected an error",file:file,line:line) } catch {} }
 let tests=AudioCoreTests()
 let cases:[(String,() throws -> Void)]=[
+("delete automatic overlap / boundaries / stereo / saved readback",tests.testDeletionCrossfade),
+("delete head automatic 15 ms fade / markers",tests.testDeletionHeadFade),
+("delete tiny ranges / tail / all / undo-redo",tests.testDeletionShortEdgesAndHistory),
+("selectable copy format / sample rate / channels / source safety matrix",tests.testSelectableCopyFormats),
+("short copy codec limits",tests.testShortCopyCodecLimits),
 ("selection gain continuous boundaries / stereo / short ranges",tests.testSmoothSelectionGain),
 ("drag clip 48k 24bit stereo / fades / short resampling",tests.testClipRateChannelsFades),
 ("clip anti-alias resampling / pending gain snapshot",tests.testClipAliasRejectionAndPendingGain),
